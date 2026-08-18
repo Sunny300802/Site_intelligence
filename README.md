@@ -130,7 +130,6 @@ for now (they clear as you finish the remaining steps).
 
 ```powershell
 python tools\init_database.py --username admin --password "ChooseAStrongPassword#1"
-(venv) PS D:\HHCL CCTV access\site_intelligence> python tools\init_database.py --username admin --password Hetero@1
 ```
 
 This creates `data\site.db` and your dashboard login. Use a real

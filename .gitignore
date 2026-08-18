@@ -1,0 +1,21 @@
+# --- Python -----------------------------------------------------------
+__pycache__/
+*.pyc
+
+# --- Virtual environments ---------------------------------------------
+venv/
+.venv/
+
+# --- Tooling / local-only ---------------------------------------------
+.claude/
+MANUAL.md
+
+# --- Runtime logs -----------------------------------------------------
+logs/
+
+# --- Runtime data -----------------------------------------------------
+# Everything under data/ is generated at runtime: the SQLite database,
+# model weights (GBs), enrolled face crops, review images and backups.
+# All of it is either too large for git or contains personal data, so
+# none of it belongs in the repository.
+data/

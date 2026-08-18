@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------
+# Site Intelligence - Python dependencies
+#
+# IMPORTANT: install PyTorch SEPARATELY first, with the CUDA index URL,
+# or pip will give you a CPU-only build and the GPU will sit idle:
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+# Then:  pip install -r requirements.txt
+# ---------------------------------------------------------------------
+
+# vision
+ultralytics>=8.2.0
+opencv-python>=4.9.0
+numpy>=1.26.0
+
+# face recognition (GPU)
+#
+# SCRFD (detection) and AdaFace (recognition) are plain ONNX graphs that
+# the pipeline drives itself, so onnxruntime-gpu is the only requirement.
+# There is no longer any runtime dependency on insightface.
+onnxruntime-gpu>=1.17.0
+
+# ByteTrack's association step. Without scipy it falls back to a greedy
+# assignment, which still tracks but is measurably worse when two people
+# pass close together - exactly the case that causes identity switching.
+scipy>=1.11.0
+
+# OPTIONAL - only for the tools, never for the running pipeline:
+#   insightface   the old ArcFace/AntelopeV2 model, so
+#                 tools/eval_recognition.py --compare can measure the new
+#                 pipeline against the one it replaced on the same images
+#   torch         tools/export_adaface_onnx.py, to convert an AdaFace
+#                 checkpoint once (torch is installed anyway for YOLO)
+insightface>=0.7.3
+
+# database
+sqlalchemy>=2.0.0
+
+# web dashboard
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+jinja2>=3.1.0
+itsdangerous>=2.1.2
+python-multipart>=0.0.9
+
+# optional: TensorRT speed-up (must match your CUDA major version)
+# tensorrt-cu12

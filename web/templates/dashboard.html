@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Site Intelligence &middot; Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css?v=4">
+</head>
+<body data-stream-port="{{ stream_port }}" data-tz-offset="{{ tz_offset }}">
+
+<nav class="navbar navbar-expand-lg app-nav sticky-top">
+  <div class="container-fluid px-3">
+    <span class="navbar-brand d-flex align-items-center gap-2">
+      <span class="brand-mark sm"><i class="bi bi-camera-video"></i></span>
+      <span>Site Intelligence</span>
+    </span>
+    <div class="d-flex align-items-center gap-3 ms-auto">
+      <span class="badge rounded-pill live-badge" id="liveBadge">
+        <i class="bi bi-broadcast"></i> checking…
+      </span>
+      <span class="text-secondary small d-none d-md-inline" id="clock">--:--:--</span>
+      <a class="btn btn-sm btn-outline-secondary me-1" href="/chat">
+        <i class="bi bi-chat-dots"></i> Ask
+      </a>
+      <a class="btn btn-sm btn-outline-primary position-relative" href="/review">
+        <i class="bi bi-person-check"></i> Confirm
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger d-none"
+              id="reviewBadge">0</span>
+      </a>
+      <span class="text-secondary small"><i class="bi bi-person-circle me-1"></i>{{ user }}</span>
+      <a class="btn btn-sm btn-outline-secondary" href="/logout">
+        <i class="bi bi-box-arrow-right"></i>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid p-3">
+
+  <!-- filters -->
+  <div class="row g-2 mb-3 align-items-center">
+    <div class="col-auto">
+      <select id="cameraFilter" class="form-select form-select-sm">
+        <option value="">All cameras</option>
+        {% for c in cameras %}
+        <option value="{{ c.key }}">{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select id="windowFilter" class="form-select form-select-sm">
+        <option value="1">Last 1 hour</option>
+        <option value="8">Last 8 hours</option>
+        <option value="24" selected>Last 24 hours</option>
+        <option value="168">Last 7 days</option>
+      </select>
+    </div>
+    <div class="col-auto text-secondary small">
+      <i class="bi bi-info-circle"></i>
+      Entry only — exits aren't tracked on reception (faces aren't visible when leaving)
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="stat-label">In view now</div>
+          <div class="stat-value text-info" id="kpiPresent">0</div>
+          <div class="stat-sub">people currently on camera</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="stat-label">Total entries</div>
+          <div class="stat-value text-warning" id="kpiTotal">0</div>
+          <div class="stat-sub" id="kpiWindow">last 24 hours</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="stat-label">Identified</div>
+          <div class="stat-value text-success" id="kpiIdentified">0</div>
+          <div class="stat-sub">matched to an employee</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card stat-card h-100">
+        <div class="card-body">
+          <div class="stat-label">Unidentified</div>
+          <div class="stat-value text-secondary" id="kpiUnknown">0</div>
+          <div class="stat-sub">no clear face captured</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- live cameras -->
+    <div class="col-12 col-xl-7">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-camera-video me-2"></i>Live cameras</span>
+          <span class="text-secondary small">detections drawn in real time</span>
+        </div>
+        <div class="card-body">
+          <div class="row g-3" id="cameraGrid">
+            {% for c in cameras %}
+            <div class="col-12">
+              <div class="cam-tile">
+                <img data-key="{{ c.key }}" alt="{{ c.name }}" class="cam-img">
+                <div class="cam-caption">
+                  <span>{{ c.name }}</span>
+                </div>
+                <div class="cam-offline d-none">
+                  <i class="bi bi-plug"></i>
+                  <div class="mt-2 small">No video signal</div>
+                  <div class="text-secondary small">Start <code>run_pipeline.py</code></div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- who is in view -->
+    <div class="col-12 col-xl-5">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-people me-2"></i>Currently in view</span>
+          <span class="badge text-bg-secondary" id="presentCount">0</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="scroll-area" style="max-height: 330px;">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="sticky-head">
+                <tr><th>Person</th><th>Camera</th><th>Since</th><th class="text-end">Duration</th></tr>
+              </thead>
+              <tbody id="presentBody">
+                <tr><td colspan="4" class="text-secondary p-3">Nobody in view.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if has_workspace %}
+  <!-- workspace presence -->
+  <div class="row g-3 mt-0">
+    <div class="col-12 col-xl-5">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-clock-history me-2"></i>Time in work area</span>
+          <span class="text-secondary small">total per person</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="scroll-area" style="max-height: 330px;">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="sticky-head">
+                <tr><th>Person</th><th>ID</th><th class="text-end">Total time</th><th class="text-end">Sessions</th></tr>
+              </thead>
+              <tbody id="presenceTotalsBody">
+                <tr><td colspan="4" class="text-secondary p-3">No presence recorded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-7">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-person-workspace me-2"></i>Work area sessions</span>
+          <span class="text-secondary small">newest first</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="scroll-area" style="max-height: 330px;">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="sticky-head">
+                <tr><th>Person</th><th>Camera</th><th>From</th><th>Last seen</th><th class="text-end">Duration</th><th>Status</th></tr>
+              </thead>
+              <tbody id="presenceBody">
+                <tr><td colspan="6" class="text-secondary p-3">No sessions yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- entry log -->
+  <div class="row g-3 mt-0">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-box-arrow-in-right me-2"></i>Entry log</span>
+          <span class="text-secondary small">
+            names fill in automatically once a face is recognised
+          </span>
+        </div>
+        <div class="card-body p-0">
+          <div class="scroll-area" style="max-height: 420px;">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="sticky-head">
+                <tr>
+                  <th>Arrived</th>
+                  <th>Person</th>
+                  <th>ID</th>
+                  <th>Camera</th>
+                  <th>Status</th>
+                  <th class="text-end">Duration</th>
+                </tr>
+              </thead>
+              <tbody id="visitsBody">
+                <tr><td colspan="6" class="text-secondary p-3">No entries recorded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js?v=3"></script>
+</body>
+</html>

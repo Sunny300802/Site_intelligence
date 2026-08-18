@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask &middot; Site Intelligence</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css?v=4">
+  <style>
+    /* ---------- the page is a column: nav, transcript, composer ----
+       The conversation scrolls; nothing else does. The composer is
+       part of the layout rather than floating over it, so it can
+       never sit on top of the last answer. */
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+    .chat-page {
+      display: flex; flex-direction: column;
+      height: 100dvh;
+    }
+    .chat-scroll {
+      flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain;
+      padding: 1.25rem .75rem 1rem;
+    }
+    .chat-inner { max-width: 54rem; margin: 0 auto; }
+
+    /* ---------- opening screen ---------- */
+    .welcome { text-align: center; padding: 2.5rem 1rem 1rem; color: #93a1b1; }
+    .welcome .brand-mark { margin: 0 auto .9rem; }
+    .welcome h1 { font-size: 1.35rem; font-weight: 600; color: var(--ink); }
+    .welcome p { font-size: .88rem; max-width: 34rem; margin: .5rem auto 0; }
+
+    /* ---------- messages ---------- */
+    .msg { display: flex; margin-bottom: 1rem; }
+    .msg.me { justify-content: flex-end; }
+    .bubble {
+      border-radius: 14px; padding: .65rem .9rem;
+      font-size: .9rem; line-height: 1.5; max-width: 100%;
+    }
+    .msg.me .bubble {
+      background: linear-gradient(135deg, #2f6ea8, #1f4f7d);
+      color: #fff; border-bottom-right-radius: 4px; max-width: 80%;
+    }
+    .msg.bot .bubble {
+      background: var(--panel); border: 1px solid var(--edge);
+      border-bottom-left-radius: 4px; width: 100%;
+    }
+    .avatar {
+      flex: 0 0 28px; width: 28px; height: 28px; border-radius: 8px;
+      display: grid; place-items: center; margin-right: .6rem;
+      background: linear-gradient(135deg, #4dabf7, #1971c2);
+      color: #fff; font-size: .8rem;
+    }
+    .answer { margin-bottom: .2rem; }
+    .src { font-size: .72rem; color: #7c8a99; margin-top: .5rem; }
+
+    /* three dots while an answer is being worked out */
+    .dots span {
+      display: inline-block; width: 6px; height: 6px; margin-right: 4px;
+      border-radius: 50%; background: #6c7c8c;
+      animation: blink 1.2s infinite ease-in-out;
+    }
+    .dots span:nth-child(2) { animation-delay: .2s; }
+    .dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+    /* ---------- the frame a live answer was read off ---------- */
+    img.scene {
+      display: block; width: 100%; max-width: 34rem; margin-top: .6rem;
+      border: 1px solid var(--edge); border-radius: 8px;
+    }
+
+    /* ---------- result table ---------- */
+    .tablewrap {
+      max-height: 20rem; overflow: auto; margin-top: .6rem;
+      border: 1px solid var(--edge); border-radius: 8px;
+    }
+    table.mini { font-size: .8rem; width: 100%; margin: 0; }
+    table.mini thead th {
+      position: sticky; top: 0; background: #1b2129;
+      font-weight: 600; white-space: nowrap;
+      font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+      color: #8b98a8; border-bottom: 1px solid var(--edge);
+    }
+    table.mini td, table.mini th { padding: .35rem .65rem; white-space: nowrap; }
+    table.mini tbody tr:nth-child(odd) { background: rgba(255,255,255,.02); }
+
+    .sqlbox {
+      margin-top: .55rem; border-left: 2px solid #40c07a; padding-left: .6rem;
+    }
+    .sqlbox summary { cursor: pointer; color: #7c8a99; font-size: .75rem; }
+    .sqlbox code {
+      display: block; margin-top: .35rem; font-size: .74rem; color: #9fb3c8;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .showall { color: var(--accent); text-decoration: none; }
+
+    /* ---------- composer: chips, then the box ---------- */
+    .composer {
+      flex: 0 0 auto; background: var(--panel-2);
+      border-top: 1px solid var(--edge);
+      padding: .55rem .75rem calc(.6rem + env(safe-area-inset-bottom));
+    }
+    .composer-inner { max-width: 54rem; margin: 0 auto; }
+
+    .chips {
+      display: flex; gap: .4rem; margin-bottom: .5rem;
+      overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+    }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip {
+      flex: 0 0 auto; cursor: pointer; white-space: nowrap;
+      background: var(--panel); border: 1px solid var(--edge);
+      color: #b7c4d2; border-radius: 999px;
+      padding: .3rem .75rem; font-size: .78rem; line-height: 1.2;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .chip:hover, .chip:focus-visible {
+      background: rgba(77,171,247,.12); border-color: var(--accent);
+      color: #cfe4f7; outline: none;
+    }
+    .chip:disabled { opacity: .45; cursor: default; }
+    .chip:disabled:hover {
+      background: var(--panel); border-color: var(--edge); color: #b7c4d2;
+    }
+
+    .inputbar {
+      display: flex; align-items: flex-end; gap: .5rem;
+      background: var(--panel); border: 1px solid var(--edge);
+      border-radius: 14px; padding: .4rem .4rem .4rem .85rem;
+    }
+    .inputbar:focus-within { border-color: var(--accent); }
+    .inputbar textarea {
+      flex: 1 1 auto; background: transparent; border: 0; resize: none;
+      color: var(--ink); font-size: .92rem; line-height: 1.45;
+      padding: .35rem 0; max-height: 8rem; outline: none;
+    }
+    .inputbar textarea::placeholder { color: #6b7887; }
+    .send {
+      flex: 0 0 auto; width: 36px; height: 36px; border-radius: 10px;
+      border: 0; display: grid; place-items: center;
+      background: var(--accent); color: #06121f; font-size: 1rem;
+    }
+    .send:disabled { opacity: .4; }
+    .hint {
+      font-size: .7rem; color: #64717f; text-align: center;
+      margin: .4rem 0 0;
+    }
+
+    @media (max-width: 576px) {
+      .msg.me .bubble { max-width: 92%; }
+      .chat-scroll { padding: .9rem .6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="chat-page">
+
+  <nav class="navbar app-nav flex-shrink-0">
+    <div class="container-fluid px-3">
+      <span class="navbar-brand d-flex align-items-center gap-2">
+        <span class="brand-mark sm"><i class="bi bi-chat-dots"></i></span>
+        <span>Ask the cameras</span>
+      </span>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <button id="clear" class="btn btn-sm btn-outline-secondary" title="Start again">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+        <a class="btn btn-sm btn-outline-secondary" href="/"><i class="bi bi-speedometer2"></i><span class="d-none d-sm-inline"> Dashboard</span></a>
+        <a class="btn btn-sm btn-outline-secondary" href="/review"><i class="bi bi-person-check"></i><span class="d-none d-sm-inline"> Confirm</span></a>
+        <a class="btn btn-sm btn-outline-secondary" href="/logout"><i class="bi bi-box-arrow-right"></i></a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="chat-scroll" id="scroll">
+    <div class="chat-inner">
+      <div id="welcome" class="welcome">
+        <span class="brand-mark"><i class="bi bi-camera-video"></i></span>
+        <h1>What would you like to know?</h1>
+        <p>
+          Ask about the cameras, who is present, or when somebody arrived.
+          Common questions are answered straight from the records; anything
+          unusual is turned into a query, and that query is shown to you.
+        </p>
+      </div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <div class="chips" id="chips">
+        {% for c in chips %}
+        <button type="button" class="chip" data-q="{{ c.q }}">{{ c.label }}</button>
+        {% endfor %}
+      </div>
+
+      <form id="askForm">
+        <div class="inputbar">
+          <textarea id="q" rows="1" autocomplete="off"
+                    placeholder="Ask about the cameras&hellip;"></textarea>
+          <button class="send" type="submit" id="send" title="Send">
+            <i class="bi bi-arrow-up"></i>
+          </button>
+        </div>
+      </form>
+      <p class="hint">Answers come from the recorded data. Enter sends, Shift+Enter for a new line.</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/chat.js?v=3"></script>
+</body>
+</html>
